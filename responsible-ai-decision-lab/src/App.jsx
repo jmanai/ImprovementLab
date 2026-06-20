@@ -1,0 +1,384 @@
+import { useMemo, useState } from "react";
+import {
+  ArrowRight,
+  Check,
+  CheckCircle,
+  ClipboardText,
+  Lightbulb,
+  Plus,
+  ShieldCheck,
+  Sparkle,
+} from "@phosphor-icons/react";
+
+const stages = [
+  { name: "Change Idea", prompt: "What small change could we test?" },
+  { name: "Plan", prompt: "What change can we test?" },
+  { name: "Do", prompt: "What will we observe?" },
+  { name: "Study", prompt: "What did we learn?" },
+  { name: "Act", prompt: "What should happen next?" },
+];
+
+const checks = [
+  ["evidence", "Evidence", "Is this claim supported by credible data?"],
+  ["context", "Context", "Does it fit this school and these learners?"],
+  ["ethics", "Ethics", "Could it harm fairness, privacy, or wellbeing?"],
+  ["feasibility", "Feasibility", "Can a small, realistic test be run?"],
+];
+
+const defaultCheckState = Object.fromEntries(checks.map(([key]) => [key, false]));
+
+export function App() {
+  const [stage, setStage] = useState(0);
+  const [checksState, setChecksState] = useState(defaultCheckState);
+  const [reflection, setReflection] = useState("");
+  const [plan, setPlan] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const [topicDraft, setTopicDraft] = useState("");
+  const [topic, setTopic] = useState("");
+  const [revisionDraft, setRevisionDraft] = useState("");
+  const [appliedRevision, setAppliedRevision] = useState("");
+  const [recommendationVersion, setRecommendationVersion] = useState(1);
+  const [dataEntry, setDataEntry] = useState({ measure: "", result: "", source: "", note: "" });
+  const [dataLog, setDataLog] = useState([]);
+  const [learning, setLearning] = useState("");
+  const [actionDecision, setActionDecision] = useState("");
+  const [actionReason, setActionReason] = useState("");
+
+  const selectedCount = Object.values(checksState).filter(Boolean).length;
+  const canAdvance = stage === 0
+    ? selectedCount >= 3
+    : stage === 1
+      ? plan.trim().length >= 24
+      : stage === 2
+        ? dataLog.length >= 1
+        : stage === 3
+          ? learning.trim().length >= 20
+          : true;
+  const summary = useMemo(
+    () => `${selectedCount}/4 decision checks completed`,
+    [selectedCount],
+  );
+
+  function toggleCheck(key) {
+    setChecksState((current) => ({ ...current, [key]: !current[key] }));
+    setFeedback("");
+  }
+
+  function tailorRecommendation() {
+    const cleanedTopic = topicDraft.trim();
+    if (!cleanedTopic) {
+      setFeedback("Describe a problem of practice first so the recommendation can be tailored to your context.");
+      return;
+    }
+    setTopic(cleanedTopic);
+    setChecksState(defaultCheckState);
+    setRevisionDraft("");
+    setAppliedRevision("");
+    setRecommendationVersion(1);
+    setFeedback("Tailored recommendation ready. Now test it against evidence, context, ethics, and feasibility.");
+  }
+
+  function reviseRecommendation() {
+    const cleanedRevision = revisionDraft.trim();
+    if (!topic) {
+      setFeedback("Describe your problem of practice before revising a recommendation.");
+      return;
+    }
+    if (!cleanedRevision) {
+      setFeedback("Explain what does not fit or what you need to change before revising the recommendation.");
+      return;
+    }
+    setAppliedRevision(cleanedRevision);
+    setRecommendationVersion((current) => current + 1);
+    setChecksState(defaultCheckState);
+    setFeedback("Revised recommendation ready. Re-check it against evidence, context, ethics, and feasibility.");
+  }
+
+  function updateDataEntry(field, value) {
+    setDataEntry((current) => ({ ...current, [field]: value }));
+  }
+
+  function addDataPoint() {
+    if (!dataEntry.measure.trim() || !dataEntry.result.trim()) {
+      setFeedback("Add a measure and an observation or result before saving the data point.");
+      return;
+    }
+    setDataLog((current) => [...current, { ...dataEntry, id: `${Date.now()}-${current.length}` }]);
+    setDataEntry({ measure: "", result: "", source: "", note: "" });
+    setFeedback("Data point saved. You can add more observations or move to Study when ready.");
+  }
+
+  function nextStage() {
+    if (stage === 0 && !topic) {
+      setFeedback("Generate a tailored recommendation before moving to the PDSA plan.");
+      return;
+    }
+    if (!canAdvance) {
+      const prompts = [
+        "Choose at least three decision checks before moving on.",
+        "Write a concise PDSA test before moving on.",
+        "Save at least one data point before moving on to Study.",
+        "Record what you learned from the data before choosing an action.",
+      ];
+      setFeedback(prompts[stage]);
+      return;
+    }
+    setFeedback("");
+    setStage((current) => Math.min(current + 1, stages.length - 1));
+  }
+
+  function backStage() {
+    setFeedback("");
+    setStage((current) => Math.max(current - 1, 0));
+  }
+
+  function complete() {
+    if (stage === 4 && (!actionDecision || actionReason.trim().length < 16)) {
+      setFeedback("Choose Adopt, Adapt, or Abandon, then explain why before completing the decision lab.");
+      return;
+    }
+    setFeedback("Reflection saved. Your decision notes are ready to take into an Improvement Leadership Brief.");
+  }
+
+  return (
+    <main className="app-shell">
+      <aside className="sidebar" aria-label="Learning progress">
+        <div className="brand">
+          <div className="brand-mark"><Sparkle size={20} weight="fill" /></div>
+          <div>
+            <p className="brand-title">Improvement Lab</p>
+            <p className="brand-subtitle">Responsible AI for school leaders</p>
+          </div>
+        </div>
+
+        <div className="side-intro">
+          <p className="eyebrow">LEARNING JOURNEY</p>
+          <h1>From AI suggestion to responsible decision.</h1>
+          <p>Use improvement science to test an AI recommendation before acting on it.</p>
+        </div>
+
+        <ol className="stage-list">
+          {stages.map((item, index) => (
+            <li className={`stage ${index === stage ? "active" : ""} ${index < stage ? "done" : ""}`} key={item.name}>
+              <button type="button" onClick={() => setStage(index)} aria-current={index === stage ? "step" : undefined}>
+                <span className="stage-number">{index < stage ? <Check size={16} weight="bold" /> : index + 1}</span>
+                <span>
+                  <strong>{item.name}</strong>
+                  <small>{item.prompt}</small>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ol>
+
+        <div className="progress-wrap">
+          <div className="progress-copy"><span>Progress</span><span>Step {stage + 1} of 5</span></div>
+          <div className="progress-track"><span style={{ width: `${((stage + 1) / 5) * 100}%` }} /></div>
+        </div>
+      </aside>
+
+      <section className="workspace">
+        <header className="topbar">
+          <div className="lesson-label"><ShieldCheck size={19} weight="fill" /> Decision lab</div>
+          <button className="save-button" type="button" onClick={complete}>Save reflection</button>
+        </header>
+
+        {stage === 0 && (
+          <section className="content-grid" aria-labelledby="aim-heading">
+            <div className="main-column">
+              <p className="eyebrow blue">STEP 1 · CHANGE IDEA</p>
+              <h2 id="aim-heading">Begin with your own problem of practice.</h2>
+              <p className="lead">Responsible improvement starts with local context. Describe the challenge you want to investigate, then generate a recommendation designed for that situation.</p>
+
+              <section className="topic-builder" aria-labelledby="topic-heading">
+                <div className="topic-builder-copy">
+                  <span className="topic-icon"><Sparkle size={18} weight="fill" /></span>
+                  <div><h3 id="topic-heading">What do you want to improve?</h3><p>Name a learner outcome, leadership challenge, or school-based concern.</p></div>
+                </div>
+                <div className="topic-controls">
+                  <label className="sr-only" htmlFor="topic">Problem of practice</label>
+                  <input id="topic" value={topicDraft} onChange={(event) => setTopicDraft(event.target.value)} placeholder="e.g., Grade 9 attendance and student belonging" />
+                  <button className="tailor-button" type="button" onClick={tailorRecommendation}>Tailor with AI <Sparkle size={17} weight="fill" /></button>
+                </div>
+                {topic && <p className="topic-confirmation"><CheckCircle size={17} weight="fill" /> Recommendation tailored to: <strong>{topic}</strong></p>}
+              </section>
+
+              <article className="ai-recommendation">
+                <div className="recommendation-topline"><span><Sparkle size={17} weight="fill" /> AI-GENERATED RECOMMENDATION</span><span>Version {recommendationVersion}</span></div>
+                {topic ? (
+                  <>
+                    <blockquote>{appliedRevision ? <>“For <em>{topic}</em>, begin by addressing this local condition: <em>{appliedRevision}</em> Co-design a two-week, low-risk inquiry with the practitioners and learners affected. Use AI only to synthesise anonymised patterns and draft neutral questions—not to make decisions about people.”</> : <>“Run a two-week, low-risk inquiry into <em>{topic}</em> with one small cohort. Use AI only to synthesise anonymised patterns and draft neutral questions for a staff and learner listening session.”</>}</blockquote>
+                    <p className="recommendation-note">Before acting, validate this proposal with local evidence, human judgement, privacy safeguards, and the people affected.</p>
+                  </>
+                ) : (
+                  <>
+                    <blockquote className="placeholder-recommendation">Your tailored recommendation will appear here.</blockquote>
+                    <p className="recommendation-note">It will be grounded in the problem of practice you enter above—not a one-size-fits-all solution.</p>
+                  </>
+                )}
+              </article>
+
+              {topic && <section className="revision-builder" aria-labelledby="revision-heading">
+                <div><p className="eyebrow">PRACTITIONER JUDGEMENT</p><h3 id="revision-heading">Not applicable? Change the recommendation.</h3><p>Explain what does not fit your setting, who needs to be involved, or what constraint the recommendation missed.</p></div>
+                <label className="sr-only" htmlFor="revision">What should change?</label>
+                <textarea id="revision" value={revisionDraft} onChange={(event) => setRevisionDraft(event.target.value)} placeholder="e.g., We cannot add a new tool this term; the intervention must use existing mentor time and include student voice." />
+                <button className="revision-button" type="button" onClick={reviseRecommendation}>Revise recommendation <Sparkle size={16} weight="fill" /></button>
+              </section>}
+
+              <div className="question-block">
+                <div>
+                  <h3>What should be examined first?</h3>
+                  <p>Select the checks that would help you make a responsible decision.</p>
+                </div>
+                <span className="selection-count">{summary}</span>
+              </div>
+
+              <div className={`check-grid ${topic ? "" : "inactive"}`}>
+                {checks.map(([key, label, description]) => (
+                  <button className={`check-card ${checksState[key] ? "selected" : ""}`} type="button" key={key} onClick={() => toggleCheck(key)} aria-pressed={checksState[key]} disabled={!topic}>
+                    <span className="check-box">{checksState[key] && <Check size={16} weight="bold" />}</span>
+                    <span><strong>{label}</strong><small>{description}</small></span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="reflection-row">
+                <label htmlFor="reflection"><span>Quick reflection</span>Which question matters most in your context, and why?</label>
+                <textarea id="reflection" maxLength="300" value={reflection} onChange={(event) => setReflection(event.target.value)} placeholder="Write one observation from your school context…" />
+                <p className="character-count">{reflection.length}/300</p>
+              </div>
+            </div>
+
+            <aside className="insight-panel">
+              <div className="insight-icon"><Lightbulb size={25} weight="fill" /></div>
+              <p className="eyebrow">IMPROVEMENT SCIENCE LENS</p>
+              <h3>Start small. Learn quickly.</h3>
+              <p>A promising idea is not yet an improvement. A responsible leader asks what evidence is needed, whose experience matters, and what can safely be tested.</p>
+              <div className="aim-card">
+                <span>Suggested change idea</span>
+                <strong>{topic ? `Test one supported practice with a small group over two weeks to learn more about ${topic}.` : "Your tailored change idea will appear here after you describe a local problem of practice."}</strong>
+              </div>
+            </aside>
+          </section>
+        )}
+
+        {stage === 1 && (
+          <section className="single-stage" aria-labelledby="plan-heading">
+            <p className="eyebrow blue">STEP 2 · PLAN</p>
+            <h2 id="plan-heading">Design a small, ethical PDSA test.</h2>
+            <p className="lead">Instead of implementing the AI recommendation school-wide, define one test that protects learner wellbeing and generates useful evidence.</p>
+            <div className="plan-canvas">
+              <div className="plan-card"><span>WHO?</span><strong>One small cohort and the practitioners closest to {topic || "the problem"}</strong></div>
+              <div className="plan-card"><span>WHAT?</span><strong>Test one human-led change informed by the tailored AI inquiry</strong></div>
+              <div className="plan-card"><span>MEASURE?</span><strong>Relevant outcomes, practitioner workload, and learner or stakeholder feedback</strong></div>
+              <div className="plan-card"><span>SAFEGUARD?</span><strong>Teacher oversight, consent, and no student data upload</strong></div>
+            </div>
+            <label className="large-field" htmlFor="plan"><span>Your PDSA test</span>Describe one small change you would test, what you would measure, and how you would protect people.</label>
+            <textarea id="plan" value={plan} onChange={(event) => setPlan(event.target.value)} placeholder="For two weeks, I would test…" />
+          </section>
+        )}
+
+        {stage === 2 && <DoStage dataEntry={dataEntry} dataLog={dataLog} topic={topic} onChange={updateDataEntry} onAdd={addDataPoint} />}
+        {stage === 3 && <StudyStage dataLog={dataLog} learning={learning} onLearningChange={setLearning} topic={topic} />}
+        {stage === 4 && <ActStage decision={actionDecision} reason={actionReason} onDecision={setActionDecision} onReasonChange={setActionReason} topic={topic} />}
+
+        <footer className="action-footer">
+          <div>
+            {feedback && <p className="feedback" role="status"><CheckCircle size={18} weight="fill" /> {feedback}</p>}
+          </div>
+          <div className="footer-actions">
+            {stage > 0 && <button className="secondary-button" type="button" onClick={backStage}>Back</button>}
+            {stage < stages.length - 1 ? <button className="primary-button" type="button" onClick={nextStage}>Continue to {stages[stage + 1].name}<ArrowRight size={19} weight="bold" /></button> : <button className="primary-button" type="button" onClick={complete}>Complete decision lab<Check size={19} weight="bold" /></button>}
+          </div>
+        </footer>
+      </section>
+    </main>
+  );
+}
+
+function DoStage({ dataEntry, dataLog, topic, onChange, onAdd }) {
+  return (
+    <section className="single-stage data-stage" aria-labelledby="do-heading">
+      <p className="eyebrow blue">STEP 3 · DO</p>
+      <h2 id="do-heading">Collect small, useful pieces of data.</h2>
+      <p className="lead">Record what happens during the test. Capture both measurable signals and the human experience around {topic || "your problem of practice"}.</p>
+
+      <section className="data-form" aria-labelledby="data-form-heading">
+        <div className="data-form-heading"><div><p className="eyebrow">DATA COLLECTION</p><h3 id="data-form-heading">Add an observation</h3></div><span>{dataLog.length} saved</span></div>
+        <div className="data-grid">
+          <label>Measure or question<input value={dataEntry.measure} onChange={(event) => onChange("measure", event.target.value)} placeholder="e.g., Attendance rate" /></label>
+          <label>Observation or result<input value={dataEntry.result} onChange={(event) => onChange("result", event.target.value)} placeholder="e.g., 87% this week" /></label>
+          <label>Source of evidence<input value={dataEntry.source} onChange={(event) => onChange("source", event.target.value)} placeholder="e.g., Attendance dashboard" /></label>
+          <label>Context note<input value={dataEntry.note} onChange={(event) => onChange("note", event.target.value)} placeholder="e.g., Learners asked for check-ins" /></label>
+        </div>
+        <button className="add-data-button" type="button" onClick={onAdd}><Plus size={17} weight="bold" /> Save data point</button>
+      </section>
+
+      <section className="data-log" aria-live="polite" aria-labelledby="data-log-heading">
+        <div className="data-log-header"><h3 id="data-log-heading">Collected data</h3><p>Keep it small, contextual, and connected to the test.</p></div>
+        {dataLog.length ? (
+          <div className="data-list">
+            {dataLog.map((item) => <article className="data-item" key={item.id}><strong>{item.measure}</strong><span>{item.result}</span><small>{item.source || "Source not specified"}{item.note ? ` · ${item.note}` : ""}</small></article>)}
+          </div>
+        ) : <p className="empty-data">No data has been recorded yet. Start with one observation; improvement starts with what you can learn, not with perfect data.</p>}
+      </section>
+    </section>
+  );
+}
+
+function StudyStage({ dataLog, learning, onLearningChange, topic }) {
+  return (
+    <section className="single-stage study-stage" aria-labelledby="study-heading">
+      <p className="eyebrow blue">STEP 4 · STUDY</p>
+      <h2 id="study-heading">Turn data into learning.</h2>
+      <p className="lead">Study the evidence before deciding what to do next. Look for patterns, unintended consequences, and perspectives that need more attention in {topic || "your test"}.</p>
+
+      <section className="study-evidence" aria-labelledby="study-evidence-heading">
+        <div className="data-log-header"><h3 id="study-evidence-heading">Evidence to study</h3><p>{dataLog.length ? `${dataLog.length} data point${dataLog.length === 1 ? "" : "s"} collected during Do.` : "Return to Do to collect evidence first."}</p></div>
+        {dataLog.length ? <div className="data-list">{dataLog.map((item) => <article className="data-item" key={item.id}><strong>{item.measure}</strong><span>{item.result}</span><small>{item.source || "Source not specified"}{item.note ? ` · ${item.note}` : ""}</small></article>)}</div> : <p className="empty-data">No data points are available yet.</p>}
+      </section>
+
+      <label className="learning-field" htmlFor="learning"><span>What did you learn from the data?</span>What pattern did you notice? What surprised you? Whose experience should shape the next decision?</label>
+      <textarea id="learning" value={learning} onChange={(event) => onLearningChange(event.target.value)} placeholder="For example: Attendance improved slightly, but learner comments show that the weekly check-in matters more than the AI-generated reminder…" />
+      <p className="character-count">{learning.length} characters</p>
+    </section>
+  );
+}
+
+function ActStage({ decision, reason, onDecision, onReasonChange, topic }) {
+  const choices = [
+    ["Adopt", "Use this approach more widely because the evidence is promising and the safeguards are in place."],
+    ["Adapt", "Change the approach, then test again because the evidence or context suggests a better version is needed."],
+    ["Abandon", "Stop this approach because the evidence, ethics, workload, or learner experience does not justify continuing."],
+  ];
+  return (
+    <section className="single-stage act-stage" aria-labelledby="act-heading">
+      <p className="eyebrow blue">STEP 5 · ACT</p>
+      <h2 id="act-heading">Choose the next responsible step.</h2>
+      <p className="lead">Based on the evidence and what you learned about {topic || "your improvement test"}, decide whether to adopt, adapt, or abandon the approach.</p>
+      <section className="action-choices" aria-labelledby="action-choice-heading">
+        <div className="data-log-header"><h3 id="action-choice-heading">What will you do next?</h3><p>There is no “correct” answer—only a decision you can justify with evidence and care.</p></div>
+        <div className="choice-grid">
+          {choices.map(([name, description]) => <button key={name} type="button" onClick={() => onDecision(name)} aria-pressed={decision === name} className={`action-choice ${decision === name ? "selected" : ""}`}><strong>{name}</strong><span>{description}</span></button>)}
+        </div>
+      </section>
+      <label className="learning-field" htmlFor="action-reason"><span>Why is this the right next step?</span>Refer to the data, learner or practitioner experience, and any ethical or practical consideration shaping your decision.</label>
+      <textarea id="action-reason" value={reason} onChange={(event) => onReasonChange(event.target.value)} placeholder="For example: Adapt. Attendance improved, but learner feedback shows that the mentor check-in matters more than the reminder. We will test a stronger mentor-led approach next." />
+      <p className="character-count">{reason.length} characters</p>
+    </section>
+  );
+}
+
+function StagePanel({ stage, title, copy, final = false }) {
+  return (
+    <section className="single-stage stage-panel" aria-labelledby={`${stage}-heading`}>
+      <p className="eyebrow blue">STEP {stages.findIndex((item) => item.name === stage) + 1} · {stage.toUpperCase()}</p>
+      <h2 id={`${stage}-heading`}>{title}</h2>
+      <p className="lead">{copy}</p>
+      <div className="stage-message">
+        <ClipboardText size={32} weight="duotone" />
+        <div><h3>{final ? "Your leadership brief is taking shape." : "A practical checkpoint."}</h3><p>{final ? "Capture your decision and the rationale behind it. This reflection becomes evidence of ethical, context-sensitive leadership." : "Use this stage to make your next decision visible, testable, and open to learning."}</p></div>
+      </div>
+    </section>
+  );
+}

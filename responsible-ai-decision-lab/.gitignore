@@ -1,0 +1,6 @@
+.vercel
+node_modules/
+.npm-cache/
+dist/
+qa-*.png
+.DS_Store
