@@ -27,6 +27,135 @@ const checks = [
 
 const defaultCheckState = Object.fromEntries(checks.map(([key]) => [key, false]));
 
+const researchBackedPatterns = [
+  {
+    id: "attendance",
+    match: [
+      "attendance",
+      "absent",
+      "absence",
+      "absentee",
+      "chronic",
+      "late",
+      "lateness",
+      "belonging",
+      "dropout",
+      "engagement",
+      "disengaged",
+      "retention",
+      "school refusal",
+    ],
+    title: "Attendance and belonging",
+    source: "IES What Works Clearinghouse dropout-prevention guidance and CASEL schoolwide SEL implementation guidance",
+    sourceUrl: "https://ies.ed.gov/ncee/wwc/practiceguide/24",
+    recommendation: (topic) => `For ${topic}, test a two-week belonging-and-attendance routine with one cohort: identify students showing early attendance risk, assign each student a named adult check-in, use a short learner voice prompt to understand barriers, and coordinate one practical family contact focused on support rather than compliance.`,
+    adaptedRecommendation: (topic, constraint) => {
+      const signals = getConstraintSignals(constraint);
+      if (signals.noFamilyContact || signals.existingTime || signals.lowWorkload) {
+        return `For ${topic}, revise the test into a two-week in-school belonging routine: use existing mentor or advisory time for a named adult check-in, ask one brief learner-voice question about barriers to attendance, and agree on one support action that can be completed during the normal school day. Do not add family outreach or a new workload requirement during this first cycle.`;
+      }
+      return `For ${topic}, revise the test around the practitioner constraint: keep the named adult check-in and learner-voice prompt, but replace any step that does not fit the setting with one support action the team can complete inside current routines.`;
+    },
+    rationale: "Research-based dropout-prevention guidance emphasizes early identification, adult advocacy, engagement, and targeted supports. SEL implementation guidance also treats belonging and relationships as conditions for learning, not as side issues.",
+    test: "Run the routine with one grade/team for 10 school days before expanding.",
+    data: "Track daily attendance, late arrivals, check-in completion, student belonging pulse responses, and staff workload.",
+  },
+  {
+    id: "writing",
+    match: ["writing", "essay", "paragraph", "composition", "argument", "literacy", "reading response", "explain", "revision"],
+    title: "Writing and literacy",
+    source: "IES What Works Clearinghouse practice guide: Teaching Secondary Students to Write Effectively",
+    sourceUrl: "https://ies.ed.gov/ncee/wwc/practiceguide/22",
+    recommendation: (topic) => `For ${topic}, test an explicit Model-Practice-Reflect writing cycle: model one target strategy, let students practise with a shared rubric or exemplar, then use a short reflection to help them explain what improved in their writing and what still needs revision.`,
+    rationale: "WWC writing guidance highlights explicit strategy instruction and structured practice/reflection as evidence-based ways to improve secondary writing.",
+    test: "Try one writing strategy in one unit or with one class section before scaling.",
+    data: "Compare a short pre/post writing sample, rubric evidence on the target skill, student reflection quality, and teacher notes on misconceptions.",
+  },
+  {
+    id: "math",
+    match: ["math", "mathematics", "numeracy", "algebra", "fractions", "problem solving", "word problem", "calculation", "number"],
+    title: "Mathematics learning",
+    source: "IES What Works Clearinghouse math practice guides",
+    sourceUrl: "https://ies.ed.gov/ncee/wwc/PracticeGuide/16",
+    recommendation: (topic) => `For ${topic}, test a structured mathematical talk routine: choose one routine and one non-routine problem, pre-teach the essential vocabulary, ask students to represent their thinking visually, and close with a reflection on which strategy worked and why.`,
+    rationale: "WWC math guidance points to systematic instruction, mathematical language, visual representations, and student monitoring/reflection as research-supported practices.",
+    test: "Use the routine in two lessons with one class or intervention group.",
+    data: "Collect exit tickets, samples of visual representations, student explanation notes, and which misconceptions remain.",
+  },
+  {
+    id: "behavior",
+    match: ["behavior", "behaviour", "disruption", "discipline", "classroom management", "off task", "defiance", "expectation", "climate"],
+    title: "Behavior and classroom climate",
+    source: "IES What Works Clearinghouse behavior practice guides",
+    sourceUrl: "https://ies.ed.gov/ncee/wwc/practiceguide/31",
+    recommendation: (topic) => `For ${topic}, test a prevention-first classroom routine: define the specific behavior and its trigger, co-teach one clear replacement expectation, reinforce the desired behavior immediately, and adjust the environment before escalating consequences.`,
+    rationale: "WWC behavior guidance emphasizes identifying the specific behavior and conditions around it, modifying the environment, and teaching/reinforcing replacement skills.",
+    test: "Test one routine in one setting for two weeks, with teacher reflection after each lesson block.",
+    data: "Track frequency/context of the target behavior, positive reinforcement counts, student response, and teacher perception of classroom climate.",
+  },
+  {
+    id: "sel",
+    match: ["wellbeing", "well-being", "sel", "social emotional", "anxiety", "stress", "confidence", "motivation", "relationship", "belong"],
+    title: "Wellbeing and learner voice",
+    source: "CASEL schoolwide SEL framework and continuous-improvement guidance",
+    sourceUrl: "https://schoolguide.casel.org/focus-area-4/continuously-improve-schoolwide-sel-implementation/",
+    recommendation: (topic) => `For ${topic}, test a learner-voice and relationship routine: use a three-question pulse check, identify one common barrier, co-design one support with students, and review whether the support improves participation or confidence after two weeks.`,
+    rationale: "CASEL describes SEL as schoolwide, relationship-centered work that should be improved through iterative cycles such as PDSA.",
+    test: "Start with one advisory group, class, or grade-level team.",
+    data: "Track pulse-check patterns, student comments, participation changes, and any unintended wellbeing or workload effects.",
+  },
+  {
+    id: "assessment",
+    match: ["assessment", "feedback", "grading", "grade", "rubric", "formative", "misconception", "mastery", "progress"],
+    title: "Feedback and formative assessment",
+    source: "Research-informed formative assessment practice: clear criteria, timely feedback, and evidence of student response",
+    sourceUrl: "https://ies.ed.gov/ncee/wwc/practiceguides",
+    recommendation: (topic) => `For ${topic}, test a feedback-for-action cycle: clarify one success criterion, give students one focused piece of feedback, require a visible revision or response, and check whether the next attempt improves on that criterion.`,
+    rationale: "Formative assessment is most useful when evidence changes teaching or learning action. A small test should examine whether feedback is understood and used, not just delivered.",
+    test: "Use one criterion with one task before applying it across a full unit.",
+    data: "Compare first and revised attempts, student explanation of the feedback, teacher reteaching notes, and time required.",
+  },
+];
+
+const defaultPattern = {
+  id: "general",
+  title: "General improvement inquiry",
+  source: "IES What Works Clearinghouse practice-guide approach and improvement-science PDSA logic",
+  sourceUrl: "https://ies.ed.gov/ncee/wwc/practiceguides",
+  recommendation: (topic) => `For ${topic}, test one research-informed change with the people closest to the work: define the specific learner need, identify the likely barrier, choose one evidence-aligned practice, and run a short PDSA cycle before making any wider decision.`,
+  rationale: "WWC practice guides translate research and practitioner expertise into actionable recommendations; improvement science keeps the first step small enough to learn from local evidence.",
+  test: "Run a two-week test with one cohort, team, or classroom before scaling.",
+  data: "Collect one outcome measure, one process measure, learner/practitioner feedback, and a note about unintended effects.",
+};
+
+function getConstraintSignals(constraint) {
+  const normalized = constraint.toLowerCase();
+  return {
+    noFamilyContact: /(no|not|cannot|can't|avoid|without).{0,35}(family|parent|guardian|home|caregiver)|family contact/.test(normalized),
+    noNewTool: /(no|not|cannot|can't|avoid|without).{0,35}(new tool|technology|platform|app|software)/.test(normalized),
+    existingTime: /(existing|current|already|mentor|advisory|homeroom|lesson time|class time)/.test(normalized),
+    lowWorkload: /(workload|capacity|time|busy|burden|extra staff|additional staff|too much)/.test(normalized),
+    studentVoice: /(student voice|learner voice|student feedback|learner feedback|survey|interview)/.test(normalized),
+  };
+}
+
+function getResearchRecommendation(topic, practitionerConstraint = "") {
+  const normalized = `${topic} ${practitionerConstraint}`.toLowerCase();
+  const pattern = researchBackedPatterns.find((item) => item.match.some((term) => normalized.includes(term))) || defaultPattern;
+  const constraint = practitionerConstraint.trim();
+  const baseRecommendation = constraint && pattern.adaptedRecommendation
+    ? pattern.adaptedRecommendation(topic, constraint)
+    : pattern.recommendation(topic);
+  const genericAdaptation = constraint && !pattern.adaptedRecommendation
+    ? ` Revised for local fit: ${constraint}. Keep the evidence-based core, but reduce the test to the smallest version that practitioners can run safely in their context.`
+    : "";
+  return {
+    ...pattern,
+    constraint,
+    recommendationText: `${baseRecommendation}${genericAdaptation}`,
+  };
+}
+
 export function App() {
   const [stage, setStage] = useState(0);
   const [checksState, setChecksState] = useState(defaultCheckState);
@@ -57,6 +186,10 @@ export function App() {
   const summary = useMemo(
     () => `${selectedCount}/4 decision checks completed`,
     [selectedCount],
+  );
+  const tailoredRecommendation = useMemo(
+    () => (topic ? getResearchRecommendation(topic, appliedRevision) : null),
+    [topic, appliedRevision],
   );
 
   function toggleCheck(key) {
@@ -207,7 +340,15 @@ export function App() {
                 <div className="recommendation-topline"><span><Sparkle size={17} weight="fill" /> AI-GENERATED RECOMMENDATION</span><span>Version {recommendationVersion}</span></div>
                 {topic ? (
                   <>
-                    <blockquote>{appliedRevision ? <>“For <em>{topic}</em>, begin by addressing this local condition: <em>{appliedRevision}</em> Co-design a two-week, low-risk inquiry with the practitioners and learners affected. Use AI only to synthesise anonymised patterns and draft neutral questions—not to make decisions about people.”</> : <>“Run a two-week, low-risk inquiry into <em>{topic}</em> with one small cohort. Use AI only to synthesise anonymised patterns and draft neutral questions for a staff and learner listening session.”</>}</blockquote>
+                    <div className="recommendation-domain">{tailoredRecommendation.title}</div>
+                    <blockquote>“{tailoredRecommendation.recommendationText}”</blockquote>
+                    {tailoredRecommendation.constraint && <p className="revision-applied"><strong>Revision applied:</strong> {tailoredRecommendation.constraint}</p>}
+                    <div className="recommendation-evidence">
+                      <p><strong>Research basis:</strong> {tailoredRecommendation.rationale}</p>
+                      <p><strong>Source:</strong> <a href={tailoredRecommendation.sourceUrl} target="_blank" rel="noreferrer">{tailoredRecommendation.source}</a></p>
+                      <p><strong>Small test:</strong> {tailoredRecommendation.test}</p>
+                      <p><strong>Data to collect:</strong> {tailoredRecommendation.data}</p>
+                    </div>
                     <p className="recommendation-note">Before acting, validate this proposal with local evidence, human judgement, privacy safeguards, and the people affected.</p>
                   </>
                 ) : (
@@ -256,7 +397,7 @@ export function App() {
               <p>A promising idea is not yet an improvement. A responsible leader asks what evidence is needed, whose experience matters, and what can safely be tested.</p>
               <div className="aim-card">
                 <span>Suggested change idea</span>
-                <strong>{topic ? `Test one supported practice with a small group over two weeks to learn more about ${topic}.` : "Your tailored change idea will appear here after you describe a local problem of practice."}</strong>
+                <strong>{tailoredRecommendation ? tailoredRecommendation.test : "Your tailored change idea will appear here after you describe a local problem of practice."}</strong>
               </div>
             </aside>
           </section>
