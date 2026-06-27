@@ -1,4 +1,4 @@
-# Prototype Instructions
+# Improvement Lab Instructions
 
 Run the local server yourself and open the preview in the in-app browser. Do not give the user server-start instructions when you can run it.
 
